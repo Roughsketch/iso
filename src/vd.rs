@@ -87,7 +87,43 @@ pub fn read_str<R: Read>(mut reader: R, len: usize) -> Result<String, std::io::E
 }
 
 pub fn read_date<R: Read>(mut reader: R) -> Result<DateTime<FixedOffset>, std::io::Error> {
+    let mut data = [0; 7];
+    reader.read_exact(&mut data)?;
+
+    if  data[1] < 1 || data[1] > 12 ||  //  Month   (1 - 12)
+        data[2] < 1 || data[2] > 31 ||  //  Day     (1 - 31)
+        data[3] > 23 ||                 //  Hour    (0 - 23)
+        data[4] > 59 ||                 //  Minute  (0 - 59)
+        data[5] > 59                    //  Second  (0 - 59)
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("Invalid date {:?}", data)).into());
+    }
+
+    let date = format!("{}{}{}{}{}{}{}",
+        data[0] as u16 + 1900,
+        data[1],
+        data[2],
+        data[3],
+        data[4],
+        data[5],
+        gmt_to_utc_str(data[6] as i8)?
+    );
+
+    match DateTime::parse_from_str(&date, "%Y%m%d%H%M%S%z") {
+        Ok(date) => Ok(date),
+        Err(why) => Err(
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("{:?}", why)).into()
+            ),
+    }
+}
+
+pub fn read_date_str<R: Read>(mut reader: R) -> Result<DateTime<FixedOffset>, std::io::Error> {
     let mut date = read_str(&mut reader, 16)?;
+    let gmt = reader.read_i8()?;
 
     //  If date is all zero, then return the epoch
     if date == "0000000000000000" {
@@ -98,8 +134,22 @@ pub fn read_date<R: Read>(mut reader: R) -> Result<DateTime<FixedOffset>, std::i
             );
     }
 
-    let mut gmt = reader.read_i8()?;
+    //  ISO 9660 gives us 2 digits for fractional seconds,
+    //  but chrono expects a minimum of 3 digits.
+    date.push_str("0");
+    date.push_str(&gmt_to_utc_str(gmt)?);
 
+    match DateTime::parse_from_str(&date, "%Y%m%d%H%M%S%3f%z") {
+        Ok(date) => Ok(date),
+        Err(why) => Err(
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("{:?}", why)).into()
+            ),
+    }
+}
+
+fn gmt_to_utc_str(mut gmt: i8) -> Result<String, std::io::Error> {
     //  GMT byte ranges from 0 - 100, but is mapped to -48 to 52
     if gmt < 0 || gmt > 100 {
         //  If not in expected range, return an error
@@ -111,25 +161,11 @@ pub fn read_date<R: Read>(mut reader: R) -> Result<DateTime<FixedOffset>, std::i
     }
 
     //  Convert the given -48 to +52 to UTC format for chrono
-    let utc = (gmt / 4) * 100 + (gmt % 4) * 15;
+    let utc: i16 = (gmt as i16 / 4) * 100 + (gmt as i16 % 4) * 15;
 
-    //  ISO 9660 gives us 2 digits for fractional seconds,
-    //  but chrono expects a minimum of 3 digits.
-    date.push_str("0");
-
-    //  Append the calculated UTC offset to the date
     if utc > 0 {
-        date.push_str(&format!("+{:04}", utc));
+        Ok(format!("+{:04}", utc))
     } else {
-        date.push_str(&format!("-{:04}", utc.abs()));
-    }
-
-    match DateTime::parse_from_str(&date, "%Y%m%d%H%M%S%3f%z") {
-        Ok(date) => Ok(date),
-        Err(why) => Err(
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("{:?}", why)).into()
-            ),
+        Ok(format!("-{:04}", utc.abs()))
     }
 }

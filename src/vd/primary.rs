@@ -2,7 +2,7 @@ use std::io::{Read, Seek, SeekFrom};
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use chrono::prelude::*;
 
-use crate::vd::{read_date, read_str, DirectoryEntry, VolumeDescriptor};
+use crate::vd::{read_date_str, read_str, DirectoryEntry, VolumeDescriptor};
 
 #[derive(Clone)]
 pub struct PrimaryVolume {
@@ -143,10 +143,10 @@ impl PrimaryVolume {
         primary.abstract_file_id = read_str(&mut reader, 36)?;
         primary.bibliographic_file_id = read_str(&mut reader, 37)?;
 
-        primary.vol_create_date = read_date(&mut reader)?;
-        primary.vol_modify_date = read_date(&mut reader)?;
-        primary.vol_expiration_date = read_date(&mut reader)?;
-        primary.vol_effective_date = read_date(&mut reader)?;
+        primary.vol_create_date = read_date_str(&mut reader)?;
+        primary.vol_modify_date = read_date_str(&mut reader)?;
+        primary.vol_expiration_date = read_date_str(&mut reader)?;
+        primary.vol_effective_date = read_date_str(&mut reader)?;
 
         primary.fs_version = reader.read_u8()?;
         reader.seek(SeekFrom::Current(1))?;
