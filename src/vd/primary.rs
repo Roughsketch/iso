@@ -47,7 +47,7 @@ impl Default for PrimaryVolume {
             le_opt_path_table: 0,
             be_path_table: 0,
             be_opt_path_table: 0,
-            root_dir: DirectoryEntry {},
+            root_dir: Default::default(),
             vol_set_id: "".into(),
             publisher_id: "".into(),
             data_preparer_id: "".into(),

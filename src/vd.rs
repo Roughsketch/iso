@@ -43,7 +43,35 @@ impl VolumeDescriptor {
 }
 
 #[derive(Clone, Debug)]
-struct DirectoryEntry {}
+struct DirectoryEntry {
+    len: u8,
+    ext_attrib_len: u8,
+    location: u32,
+    data_len: u32,
+    rec_date: DateTime<FixedOffset>,
+    file_flags: u8,
+    file_unit_size: u8,
+    interleave_gap_size: u8,
+    vol_seq_num: u16,
+    file_id_len: u8,
+}
+
+impl Default for DirectoryEntry {
+    fn default() -> DirectoryEntry {
+        DirectoryEntry {
+            len: 0,
+            ext_attrib_len: 0,
+            location: 0,
+            data_len: 0,
+            rec_date: DateTime::<FixedOffset>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc.fix()),
+            file_flags: 0,
+            file_unit_size: 0,
+            interleave_gap_size: 0,
+            vol_seq_num: 0,
+            file_id_len: 0,
+        }
+    }
+}
 
 pub fn read_str<R: Read>(mut reader: R, len: usize) -> Result<String, std::io::Error> {
     let mut buf = vec![0; len];
