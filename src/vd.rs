@@ -1,3 +1,12 @@
+use std::io::{Read, Seek};
+
+pub mod boot;
+pub mod primary;
+pub mod supplementary;
+
+use crate::vd::{boot::BootRecord, primary::PrimaryVolume, supplementary::SupplementaryVolume};
+
+#[derive(Clone, Debug)]
 pub enum VolumeDescriptor {
     Boot(BootRecord),
     Primary(PrimaryVolume),
@@ -6,42 +15,39 @@ pub enum VolumeDescriptor {
     Terminator,
 }
 
+impl VolumeDescriptor {
+    pub fn from_reader<R: Read + Seek>(mut reader: R) -> Result<VolumeDescriptor, std::io::Error> {
+        let mut header = [0u8; 7];
+
+        reader.read_exact(&mut header)?;
+
+        if &header[1..6] != b"CD001" || header[6] != 1 {
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid header constant").into());
+        }
+
+        match header[0] {
+            0 => Ok(BootRecord::from_reader(&mut reader)?),
+            1 => Ok(PrimaryVolume::from_reader(&mut reader)?),
+            2 => Ok(SupplementaryVolume::from_reader(&mut reader)?),
+            3 => Ok(VolumeDescriptor::Partition),
+            255 => Ok(VolumeDescriptor::Terminator),
+            _ => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid volume descriptor").into()),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 struct DirectoryEntry {}
 
-pub struct BootRecord {
-    sys_ident: String,
-    ident: String,
-    data: [u8; 1977],
-}
+pub fn read_str<R: Read>(mut reader: R, len: usize) -> Result<String, std::io::Error> {
+    let mut buf = vec![0; len];
+    reader.read_exact(&mut buf)?;
 
-pub struct PrimaryVolume {
-    sys_id: String,
-    vol_id: String,
-    vol_space_size: u32,
-    vol_set_size: u32,
-    vol_seq_num: u16,
-    logical_block_size: u16,
-    path_table_size: u32,
-    le_path_table: u32,
-    le_opt_path_table: u32,
-    be_path_table: u32,
-    be_opt_path_table: u32,
-    root_dir: DirectoryEntry,
-    vol_set_id: String,
-    publisher_id: String,
-    data_preparer_id: String,
-    app_id: String,
-    copyright_id: String,
-    abstract_file_id: String,
-    bibliographic_file_id: String,
-    vol_create_date: String,
-    vol_modify_date: String,
-    vol_expiration_date: String,
-    vol_effective_date: String,
-    fs_version: u8,
-    app_data: [u8; 512],
-}
-
-pub struct SupplementaryVolume {
-
+    match std::str::from_utf8(&buf) {
+        Ok(s) => {
+            println!("Read string: {}", s.to_owned());
+            Ok(s.trim().into())
+        },
+        Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid boot record system identifier").into()),
+    }
 }
