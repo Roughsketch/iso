@@ -1,7 +1,8 @@
 use std::io::{Read, Seek, SeekFrom};
 use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
+use chrono::prelude::*;
 
-use crate::vd::{read_str, DirectoryEntry, VolumeDescriptor};
+use crate::vd::{read_date, read_str, DirectoryEntry, VolumeDescriptor};
 
 #[derive(Clone)]
 pub struct PrimaryVolume {
@@ -24,10 +25,10 @@ pub struct PrimaryVolume {
     copyright_id: String,
     abstract_file_id: String,
     bibliographic_file_id: String,
-    vol_create_date: String,
-    vol_modify_date: String,
-    vol_expiration_date: String,
-    vol_effective_date: String,
+    vol_create_date: DateTime<FixedOffset>,
+    vol_modify_date: DateTime<FixedOffset>,
+    vol_expiration_date: DateTime<FixedOffset>,
+    vol_effective_date: DateTime<FixedOffset>,
     fs_version: u8,
     app_data: [u8; 512],
 }
@@ -54,10 +55,10 @@ impl Default for PrimaryVolume {
             copyright_id: "".into(),
             abstract_file_id: "".into(),
             bibliographic_file_id: "".into(),
-            vol_create_date: "".into(),
-            vol_modify_date: "".into(),
-            vol_expiration_date: "".into(),
-            vol_effective_date: "".into(),
+            vol_create_date: DateTime::<FixedOffset>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc.fix()),
+            vol_modify_date: DateTime::<FixedOffset>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc.fix()),
+            vol_expiration_date: DateTime::<FixedOffset>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc.fix()),
+            vol_effective_date: DateTime::<FixedOffset>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc.fix()),
             fs_version: 0,
             app_data: [0u8; 512],
         }
@@ -141,10 +142,12 @@ impl PrimaryVolume {
         primary.copyright_id = read_str(&mut reader, 38)?;
         primary.abstract_file_id = read_str(&mut reader, 36)?;
         primary.bibliographic_file_id = read_str(&mut reader, 37)?;
-        primary.vol_create_date = read_str(&mut reader, 17)?;
-        primary.vol_modify_date = read_str(&mut reader, 17)?;
-        primary.vol_expiration_date = read_str(&mut reader, 17)?;
-        primary.vol_effective_date = read_str(&mut reader, 17)?;
+
+        primary.vol_create_date = read_date(&mut reader)?;
+        primary.vol_modify_date = read_date(&mut reader)?;
+        primary.vol_expiration_date = read_date(&mut reader)?;
+        primary.vol_effective_date = read_date(&mut reader)?;
+
         primary.fs_version = reader.read_u8()?;
         reader.seek(SeekFrom::Current(1))?;
         reader.read_exact(&mut primary.app_data)?;
